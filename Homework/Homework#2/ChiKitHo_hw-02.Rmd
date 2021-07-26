@@ -1,0 +1,208 @@
+---
+title: "STAT 206 Homework 2"
+subtitle: 'ChiKit Ho'
+output: pdf_document
+---
+
+**Due Monday, October 19, 5:00 PM**
+
+***General instructions for homework***: Homework must be submitted as pdf file, and be sure to include your name in the file.  Give the commands to answer each question in its own code block, which will also produce plots that will be automatically embedded in the output file. Each answer must be supported by written statements as well as any code used.  (Examining your various objects in the "Environment" section of RStudio is insufficient -- you must use scripted commands.)
+
+The data set at [http://www.stat.cmu.edu/~cshalizi/uADA/13/hw/01/calif_penn_2011.csv] contains information about the housing stock of California and Pennsylvania, as of 2011.  Information as aggregated into "Census tracts", geographic regions of a few thousand people which are supposed to be fairly homogeneous economically and socially.
+
+1. _Loading and cleaning_
+    a. Load the data into a dataframe called `ca_pa`.
+```{r}
+ca_pa<-read.csv('http://www.stat.cmu.edu/~cshalizi/uADA/13/hw/01/calif_penn_2011.csv')
+```
+    b. How many rows and columns does the dataframe have?
+```{r}
+dim(ca_pa)
+```
+    c. Run this command, and explain, in words, what this does:
+```{r}
+colSums(apply(ca_pa,c(1,2),is.na))
+```
+This command apply the is.na function to all elements in ca_pa, it will return TRUE if the element is 'NA' 
+and return FALSE if the element is not 'NA'. Then, by using the ColSums function, it counts the number TRUE ('NA') in each column.
+So, this command acutally count the number of NA in each column in the dataframe.
+
+  d. The function `na.omit()` takes a dataframe and returns a new dataframe, omitting any row containing an NA value.  Use it to purge the data set of rows with incomplete data.
+```{r}
+ca_pa_2<-na.omit(ca_pa)
+```
+    e. How many rows did this eliminate?
+```{r}
+dim(ca_pa_2)
+nrow(ca_pa)-nrow(ca_pa_2)
+```
+670 rows were eliminated
+
+  f. Are your answers in (c) and (e) compatible? Explain.
+```{r}
+colSums(apply(ca_pa_2,c(1,2),is.na))
+```
+The answer in (c) & (e) are compatible since all NA are eliminated and all column return 0 of NA 
+when we apply the command colSums(apply(ca_pa_2,c(1,2),is.na)) again.
+
+2. _This Very New House_  
+    a. The variable `Built_2005_or_later` indicates the percentage of houses in each Census tract built since 2005.  Plot median house prices against this variable.
+```{r}
+plot(ca_pa_2$Built_2005_or_later,ca_pa_2$Median_house_value,main='Median House price',
+     xlab='Percentage of house that built since 2005',
+     ylab='Median price of House')
+```
+    b. Make a new plot, or pair of plots, which breaks this out by state.  Note that the state is recorded in the `STATEFP` variable, with California being state 6 and Pennsylvania state 42.
+```{r}
+house_ca<-subset(ca_pa_2,ca_pa_2$STATEFP==6)
+house_pa<-subset(ca_pa_2,ca_pa_2$STATEFP==42)
+plot(house_ca$Built_2005_or_later,house_ca$Median_house_value,col='blue',
+     xlab='Percentage of House', ylab='Median Price of House')
+points(house_pa$Built_2005_or_later,house_pa$Median_house_value,col='red')
+legend('topright',c('California','Pennsylvania'),col=c('blue','red'),pch=1)
+title('Median House House price by State that built after 2005')
+```
+
+3. _Nobody Home_  
+The vacancy rate is the fraction of housing units which are not occupied.  The dataframe contains columns giving the total number of housing units for each Census tract, and the number of vacant housing units.  
+    a. Add a new column to the dataframe which contains the vacancy rate.  What are the minimum, maximum, mean, and median vacancy rates?
+```{r}
+ca_pa_2$Vacant_rate <- ca_pa_2$Vacant_units/ca_pa_2$Total_units
+summary(ca_pa_2$Vacant_rate)
+```
+    b. Plot the vacancy rate against median house value.
+```{r}
+plot(ca_pa_2$Vacant_rate,ca_pa_2$Median_house_value,
+     main='Graph of Median House Price against Vacancy Rate',
+     xlab='Vacancy Rate',ylab='Median Price of House')
+```
+    c. Plot vacancy rate against median house value separately for California and for Pennsylvania.  Is there a difference?
+```{r}
+house_ca<-subset(ca_pa_2,ca_pa_2$STATEFP==6)
+house_pa<-subset(ca_pa_2,ca_pa_2$STATEFP==42)
+plot(house_ca$Vacant_rate,house_ca$Median_house_value,col='blue',
+     xlab='Vacancy Rate',ylab='Median Price of House')
+points(house_pa$Vacant_rate,house_pa$Median_house_value,col='red')
+legend('topright',c('California','Pennsylvania'),col=c('blue','red'),pch=1)
+title('Median House House price by State againt Vacancy Rate')
+```
+The Median Price of House in Pennsylvania is lower than the the house in California with the same Vacacy Rate.
+
+    
+4. The column `COUNTYFP` contains a numerical code for counties within each state.  We are interested in Alameda County (county 1 in California), Santa Clara (county 85 in California), and Allegheny County (county 3 in Pennsylvania).
+    a. Explain what the block of code at the end of this question is supposed to accomplish, and how it does it.
+
+Since there is some NA in the ca_pa, if we directly run the code, it will result in NA. Instead, we need to chnage the data frame
+from ca_pa to ca_pa_2 (the data frame that has pruge in 1d).
+The code get the for loop and if fucntion save all the row number in ca_pa_2 that the state is California (STATEFP=6), and the county is
+Alameda (CONTYFP=1). And save all the Median House value as a list called accamhv and find the median of the list.
+
+```{r}
+acca <- c()
+for (tract in 1:nrow(ca_pa_2)) {
+  if (ca_pa_2$STATEFP[tract] == 6) {
+    if (ca_pa_2$COUNTYFP[tract] == 1) {
+      acca <- c(acca, tract)
+    }
+  }
+}
+accamhv <- c()
+for (tract in acca) {
+  accamhv <- c(accamhv, ca_pa_2[tract,10])
+}
+median(accamhv)
+```
+    
+  b. Give a single line of R which gives the same final answer as the block of code.  Note: there are at least two ways to do this; you just have to find one.
+```{r}
+median(ca_pa_2$Median_house_value[ca_pa_2$STATEFP==6 & ca_pa_2$COUNTYFP==1])
+```
+  c. For Alameda, Santa Clara and Allegheny Counties, what were the average percentages of housing built since 2005?
+  
+Alameda:
+```{r}
+Alameda_Built2005<-ca_pa_2$Built_2005_or_later[ca_pa_2$STATEFP==6 & ca_pa_2$COUNTYFP==1]
+mean(Alameda_Built2005)
+```
+Santa Clara:
+```{r}
+SantaClara_Built2005<-ca_pa_2$Built_2005_or_later[ca_pa_2$STATEFP==6 & ca_pa_2$COUNTYFP==85]
+mean(SantaClara_Built2005)
+```
+Allegheny:
+```{r}
+Allegheny_Built2005<-ca_pa_2$Built_2005_or_later[ca_pa_2$STATEFP==42 & ca_pa_2$COUNTYFP==3]
+mean(Allegheny_Built2005)
+```
+    
+  d. The `cor` function calculates the correlation coefficient between two variables.  What is the correlation between median house value and the percent of housing built since 2005 in (i) the whole data, (ii) all of California, (iii) all of Pennsylvania, (iv) Alameda County, (v) Santa Clara County and (vi) Allegheny County?
+
+(i) The whole data
+```{r}
+cor(ca_pa_2$Median_house_value,ca_pa_2$Built_2005_or_later)
+```
+    
+(ii) All of California
+```{r}
+cor(house_ca$Median_house_value,house_ca$Built_2005_or_later)
+```
+    
+(iii) All of Pennsylvania
+```{r}
+cor(house_pa$Median_house_value,house_pa$Built_2005_or_later)
+```
+    
+(iv) Alameda County
+```{r}
+cor(house_ca$Median_house_value[house_ca$COUNTYFP==1],Alameda_Built2005)
+```
+    
+(v) Santa Clara County
+```{r}
+cor(house_ca$Median_house_value[house_ca$COUNTYFP==85],SantaClara_Built2005)
+```
+    
+(vi) Allegheny County
+```{r}
+cor(house_pa$Median_house_value[house_pa$COUNTYFP==3],Allegheny_Built2005)
+```   
+   
+   e. Make three plots, showing median house values against median income, for Alameda, Santa Clara, and Allegheny Counties.  (If you can fit the information into one plot, clearly distinguishing the three counties, that's OK too.)
+   
+```{r}
+plot(ca_pa_2$Mean_household_income[ca_pa_2$STATEFP==6 & ca_pa_2$COUNTYFP==1],
+     house_ca$Median_house_value[house_ca$COUNTYFP==1],
+     main='County of Alameda, California',
+     xlab='Median Household Income',ylab='Median Price of House')
+```
+```{r}
+plot(ca_pa_2$Mean_household_income[ca_pa_2$STATEFP==6 & ca_pa_2$COUNTYFP==85],
+     house_ca$Median_house_value[house_ca$COUNTYFP==85],
+     main='County of Santa Clara, California',
+     xlab='Median Household Income',ylab='Median Price of House')
+```
+```{r}
+plot(ca_pa_2$Mean_household_income[ca_pa_2$STATEFP==42 & ca_pa_2$COUNTYFP==3],
+     house_pa$Median_house_value[house_pa$COUNTYFP==3],
+     main='County of Allegheny, Pennsylvania',
+     xlab='Median Household Income',ylab='Median Price of House')
+```
+
+
+```{r, eval=FALSE}
+acca <- c()
+for (tract in 1:nrow(ca_pa)) {
+  if (ca_pa$STATEFP[tract] == 6) {
+    if (ca_pa$COUNTYFP[tract] == 1) {
+      acca <- c(acca, tract)
+    }
+  }
+}
+accamhv <- c()
+for (tract in acca) {
+  accamhv <- c(accamhv, ca_pa[tract,10])
+}
+median(accamhv)
+```
+
+

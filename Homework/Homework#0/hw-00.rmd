@@ -1,0 +1,19 @@
+---
+title: "STAT 206 Homework 0"
+output: pdf_document
+---
+
+**Complete by Monday, October 5**
+
+If you are planning on using RStudio Cloud:
+
+1. Log into RStudio Cloud (you probably need to create an account).
+2. Go to "File" >> "New File" >> "R Markdown..." which will create new R Markdown file in RStudio.  "Knit" the file to create a pdf document.
+
+If you are planning on using R and RStudio locally:
+
+1. Download and install [R](http://www.r-project.org/).
+2. Download and install [RStudio](http://rstudio.org/download/).
+3. Ensure you have a latex compiler so you can compile a pdf in the next step.
+4. Open RStudio.  Go to "File" >> "New File" >> "R Markdown..." which will create new R Markdown file in RStudio.  "Knit" the file to create a pdf document.
+

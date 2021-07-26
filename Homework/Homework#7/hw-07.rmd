@@ -1,0 +1,45 @@
+---
+title: "STAT 206 Homework 7"
+output: pdf_document
+---
+
+**Due Monday, November 23, 5:00 PM**
+
+***General instructions for homework***: Homework must be submitted as pdf file, and be sure to include your name in the file.  Give the commands to answer each question in its own code block, which will also produce plots that will be automatically embedded in the output file. Each answer must be supported by written statements as well as any code used.  (Examining your various objects in the "Environment" section of RStudio is insufficient -- you must use scripted commands.)
+
+Part I - Beverton-Holt model
+==========
+
+The dataset at [http://www.faculty.ucr.edu/~jflegal/fish.txt] contains 40 annual counts of the numbers of spawners `S` and recruits `R` in a salmon population.  The units are thousands of fish. Spawners are fish that are laying eggs. Spawners die after laying eggs. Recruits are fish that enter the catchable population.
+
+The classic **Beverton-Holt** model for the relationship between spawners and recruits is
+\[
+R = \frac{1}{\beta_1 + \beta_2 / S} \; , \quad \beta_1 > 0 , \beta_2 > 0
+\]
+where $R$ and $S$ are the number of recruits and spawners respectively.
+
+Consider the problem of maintaining a sustainable fishery. The total population abundance will only stabilize if $R=S$. The total population will decline if fewer recruits are produced than the number of spawners who died producing them. If too many recruits are produced, the population will also decline eventually because there is not enough food for them all. Thus, only a balanced level of recruits can be sustained indefinitely in a stable population. This stable population level is the point where the $45^\circ$ line intersects the curve relating $R$ and $S$. In other words, it is the $N$ such that
+\[
+N = \frac{1}{\beta_1 + \beta_2 / N} .
+\]
+Solving for $N$ we see that the stable population level is $N = (1 - \beta_2) / \beta_1$.
+
+1. Make a scatterplot of the data and overlay the Beverton-Holt curve for a couple different choices of $\beta_1$ and $\beta_2$.
+2. The Beverton-Holt model can be found by transforming $R \mapsto (1/R)$ and  and $S \mapsto (1/S)$.  That is, 
+\[
+(1/R)=\beta_1+ \beta_2(1/S) .
+\]
+This is a linear model with response variable $(1/R)$ and covariate $(1/S)$. Use least squares regression to fit this model to the fish dataset.
+3. Find an estimate for the stable population level, where $R=S$ in the Beverton-Holt model.
+4. Use the bootstrap to obtain the sampling distribution and standard error for the stable population level.  Use the bootstrap to construct a 95% confidence interval for the stable population level.
+
+Part II - Snowfall accumulations
+==========
+
+The data set `buffalo` at [http://www.faculty.ucr.edu/~jflegal/buffalo.txt] contains annual snowfall accumulations in Buffalo, NY from 1910 to 1973. 
+
+5. Construct kernel density estimates of the data using the Gaussian and Epanechnikov kernels. 
+6. Compare the estimates for different choices of bandwidth.
+7. Is the estimate more influenced by the type of kernel or the bandwidth? 
+
+

@@ -1,0 +1,246 @@
+---
+title: "STAT 206 Homework 8"
+subtitle: "ChiKit Ho"
+output: pdf_document
+---
+
+**Due Wednesday, December 9, 5:00 PM**
+
+***General instructions for homework***: Homework must be submitted as pdf file, and be sure to include your name in the file.  Give the commands to answer each question in its own code block, which will also produce plots that will be automatically embedded in the output file. Each answer must be supported by written statements as well as any code used.  (Examining your various objects in the "Environment" section of RStudio is insufficient -- you must use scripted commands.)
+
+Part I - Metropolis-Hasting algorithm
+==========
+
+Suppose $f \sim \Gamma(2,1)$.
+
+1. Write an independence MH sampler with $g \sim \Gamma(2, \theta)$.
+```{r}
+ind.chain<-function(x,n,shape=2,scale=1){
+  m<-length(x)
+  x<-append(x,double(n))
+  for (i in (m+1):length(x)){
+    x.prime<-rgamma(1,shape,scale)
+    u<-exp((x[(i-1)]-x.prime)*(1-(1/scale)))
+    if(runif(1)<u)
+    {x[i]<-x.prime}
+    else {x[i]<-x[(i-1)]}
+  }
+  return(x)
+}
+```
+2. What is $R(x_t, X^*)$ for this sampler?
+***Ans***
+e^(x_t-x*)(1-1/theta)
+***
+3. Generate 10000 draws from $f$ with $\theta \in \{ 1/2, 1, 2 \}$.
+```{r}
+trial0<-ind.chain(1,10000,shape=2,scale=1)
+trial1<-ind.chain(1,10000,shape=2,scale=1/2)
+trial2<-ind.chain(1,10000,shape=2,scale=2)
+```
+4. Write a random walk MH sampler with $h \sim N(0, \sigma^2)$.
+```{r}
+rw.chain<-function(x,n,sigma=1){
+  m<-length(x)
+  x<-append(x,double(n))
+  for (i in (m+1):length(x)){
+    x.prime<-x[(i-1)]+rnorm(1,sd=sigma)
+    u<-(x.prime/x[(i-1)])*exp(x[(i-1)]-x.prime)
+    if (runif(1)<u && x.prime>0) 
+    {x[i]<-x.prime}
+    else {x[i]<-x[(i-1)]}
+  }
+  return(x)
+}
+```
+5. What is $R(x_t, X^*)$ for this sampler?
+***Answer***
+(x* /x_t)exp(x_t-x*)
+***
+6. Generate 10000 draws from $f$ with $\sigma \in \{ .2, 1, 5 \}$.
+```{r}
+rw1<-rw.chain(1,10000,0.2)
+rw2<-rw.chain(1,10000,1)
+rw3<-rw.chain(1,10000,5)
+```
+7. In general, do you prefer an independence chain or a random walk MH sampler?  Why?
+```{r}
+par(mfrow=c(2,3))
+plot(trial0,type='l',main='IID Draws')
+plot(trial1,type='l',main='Independence with 1/2')
+plot(trial2,type='l',main='Independence with 2')
+plot(rw1,type='l',main='radom walk with 0.2')
+plot(rw2,type='l',main='radom walk with 1')
+plot(rw3,type='l',main='radom walk with 5')
+```
+Random walk looks better because independence chain either resulting a very good result or a very bad result.
+Random walk with 1 is my preferred chain
+
+8. Implement the fixed-width stopping rule for you preferred chain.
+```{r}
+library(mcmcse)
+MCSE<-mcse(rw2)$se
+N<-length(rw2)
+t<-qt(0.975,(floor(sqrt(N)-1)))
+muhat<-mean(rw2)
+check<-MCSE*t
+eps<-0.1
+while (eps<check){
+  rw2<-rw.chain(1,10000,1)
+  MCSE<-append(MCSE,mcse(rw2)$se)
+  N<-length(rw2)
+  t<-qt(0.975,(floor(sqrt(N)-1)))
+  muhat<-append(muhat,mean(rw2))
+  check<-MCSE[length(MCSE)]*t
+}
+N<-seq(10000,length(rw2),10000)
+t<-qt(0.975,(floor(sqrt(N)-1)))
+half<-MCSE*t
+sigmaht<-MCSE*sqrt(N)
+N<-seq(10000,length(rw2),10000)/10000
+```
+
+Part II - **Anguilla** eel data
+==========
+
+Consider the **Anguilla** eel data provided in the `dismo` R package. The data consists of 1,000 observations from a New Zealand survey of site-level presence or absence for the short-finned eel (Anguilla australis). We will use six out of twelve covariates. Five are continuous variables: `SegSumT`, `DSDist`, `USNative`, `DSMaxSlope` and `DSMaxSlope`; one is a categorical variable: `Method`, with five levels `Electric`, `Spo`, `Trap`, `Net` and `Mixture`.
+
+Let $x_i$ be the regression vector of covariates for the $i$th observation of length $k$ and ${\pmb \beta} = \left( \beta_0, \dots, \beta_9 \right)$ be the vector regression coefficients.  For the $i$th observation, suppose $Y_i = 1$ denotes presence and $Y_i = 0$ denotes absence of Anguilla australis. Then the Bayesian logistic regression model is given by
+\[
+\begin{aligned}
+Y_i & \sim Bernoulli(p_i) \; , \\
+p_i & \sim {\exp(x_i^{T}{\pmb \beta}) \over 1+\exp(x_i^{T}{\pmb \beta})} \; \text{ and,} \\ 
+{\pmb \beta} & \sim N({\pmb 0}, \sigma_{\beta}^2{\bf I}_k) \; ,
+\end{aligned}
+\]
+where ${\bf I}_k$ is the $k \times k$ identity matrix. For the analysis, $\sigma_{\beta}^2=100$ was chosen to represent a diffuse prior distribution on ${\pmb \beta}$.  
+
+9. Implement an MCMC sampler for the target distribution using the `MCMClogit` function in the `MCMCpack` package.
+```{r,warning=0}
+library(dismo)
+library(MCMCpack)
+data("Anguilla_train")
+posterior <- MCMClogit(Angaus~SegSumT+DSDist+USNative+DSMaxSlope+as.factor(Method), 
+                       data=Anguilla_train)
+```
+10. Comment on the mixing properties for your sampler.  Include at least one plot in support of your comments.
+```{r}
+summary(posterior)
+par(mar=c(1,1,1,1))
+plot(posterior)
+```
+11. Run your sampler for 100,000 iterations.  Estimate the posterior mean along with an 80\% Bayesian credible interval for each regression coefficient in the model.  Be sure to include uncertainty estimates.
+```{r}
+fit1<-MCMClogit(Angaus~SegSumT+DSDist+USNative+DSMaxSlope+as.factor(Method), 
+                data=Anguilla_train,mcmc=100000)
+f1<-as.matrix(fit1)
+```
+```{r}
+#SegSumT
+a=f1[,2]
+print(paste("The Posterior mean of SegSumT is ", signif(mean(a),4)))
+print(paste("The 80% Bayesian credible interval is (", signif(quantile(a,0.1),4), 
+            ",",signif(quantile(a,0.9),4),")"))
+```
+```{r}
+#DSDist
+b=f1[,3]
+print(paste("The Posterior mean of DSDist is ", signif(mean(b),4)))
+print(paste("The 80% Bayesian credible interval is (", signif(quantile(b,0.1),4), 
+            ",",signif(quantile(b,0.9),4),")"))
+```
+```{r}
+#USNative
+c=f1[,4]
+print(paste("The Posterior mean of DSDist is ", signif(mean(c),4)))
+print(paste("The 80% Bayesian credible interval is (", signif(quantile(c,0.1),4), 
+            ",",signif(quantile(c,0.9),4),")"))
+```
+```{r}
+#DSMaxSlope
+d=f1[,5]
+print(paste("The Posterior mean of DSDist is ", signif(mean(d),4)))
+print(paste("The 80% Bayesian credible interval is (", signif(quantile(d,0.1),4), 
+            ",",signif(quantile(d,0.9),4),")"))
+```
+```{r}
+#Method-Mixture
+e=f1[,6]
+print(paste("The Posterior mean of Method in Mixture is ", signif(mean(e),4)))
+print(paste("The 80% Bayesian credible interval is (", signif(quantile(e,0.1),4), 
+            ",",signif(quantile(e,0.9),4),")"))
+```
+```{r}
+#Method-Net
+f=f1[,7]
+print(paste("The Posterior mean of Method in Net is ", signif(mean(f),4)))
+print(paste("The 80% Bayesian credible interval is (", signif(quantile(f,0.1),4), 
+            ",",signif(quantile(f,0.9),4),")"))
+```
+```{r}
+#Method-Net
+g=f1[,8]
+print(paste("The Posterior mean of Method in spo is ", signif(mean(g),4)))
+print(paste("The 80% Bayesian credible interval is (", signif(quantile(g,0.1),4), 
+            ",",signif(quantile(g,0.9),4),")"))
+```
+```{r}
+#Method-trap
+h=f1[,9]
+print(paste("The Posterior mean of Method in trap is ", signif(mean(h),4)))
+print(paste("The 80% Bayesian credible interval is (", signif(quantile(h,0.1),4), 
+            ",",signif(quantile(h,0.9),4),")"))
+```
+
+12. Compare your Bayesian estimates to those obtained via maximum likelihood estimation.
+```{r}
+fit2<-glm(Angaus~SegSumT+DSDist+USNative+DSMaxSlope+as.factor(Method), data=Anguilla_train)
+summary(fit2)
+confint(fit2,level=0.8)
+```
+
+Part III - Permutation tests
+==========
+
+The Cram\'er von Mises statistic estimates the integrated square distance between distributions. It can be computed using the following formula
+\[
+W=\frac{mn}{(m+n)^2}\left[ \sum_{i=1}^n(F_n(x_i)-G_m(x_i))^2 +\sum_{j=1}^m (F_n(y_j)-G_m(y_j))^2\right]
+\]
+where $F_n$ and $G_m$ are the corresponding empirical cdfs. 
+
+13. Implement the two sample Cram\'er von Mises test for equal distributions as a permutation test. Apply it to the `chickwts` data comparing the `casein` and `linseed` diets.
+```{r}
+data(chickwts)
+X<-as.vector(chickwts$weight[chickwts$feed=="casein"])
+Y<-as.vector(chickwts$weight[chickwts$feed=="linseed"])
+B<-1000
+reps<-numeric(B)
+Z<-c(X,Y)
+N<-length(Z)
+n<-length(X)
+m<-length(Y)
+v.n<-numeric(n)
+v1.n<-numeric(n)
+v.m<-numeric(m)
+v1.m<-numeric(m)
+Ix<-seq(1:n)
+Iy<-seq(1:m)
+v.n<-(X-Ix)**2
+v.m<-(Y-Iy)**2
+rep0<-((n*sum(v.n)+m*sum(v.m))/(n*m*(n+m)))-(4*m*n-1)/(6*(m+n))
+for (i in 1:B){
+  k<-sample(N,size=n,replace=FALSE)
+  x1<-sort(Z[k])
+  y1<-sort(Z[-k])
+  v1.n<-(x1-Ix)**2
+  v1.m<-(y1-Iy)**2
+  reps[i]<-((n*sum(v1.n)+m*sum(v1.m))/(n*m*(n+m)))-(4*m*n-1)/(6*(m+n))
+}
+#p-value
+p<-mean(c(rep0,reps)>=rep0)
+p
+```
+```{r}
+hist(reps, main="Permutation Distribution",xlim=c(min(reps),6340))
+points(rep0,0, col='red',cex=1, pch=19)
+```

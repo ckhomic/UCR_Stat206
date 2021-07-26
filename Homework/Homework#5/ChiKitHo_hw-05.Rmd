@@ -1,0 +1,196 @@
+---
+title: "STAT 206 Homework 5"
+subtitle: 'ChiKit Ho'
+output: pdf_document
+---
+
+**Due Monday, November 9, 5:00 PM**
+
+***General instructions for homework***: Homework must be submitted as pdf file, and be sure to include your name in the file.  Give the commands to answer each question in its own code block, which will also produce plots that will be automatically embedded in the output file. Each answer must be supported by written statements as well as any code used.  (Examining your various objects in the "Environment" section of RStudio is insufficient -- you must use scripted commands.)
+
+Part I - Optimization and standard errors
+==========
+
+1. Using any optimization code you like, maximize the likelihood of the gamma distribution on the cats’ hearts. Start the optimization at the estimate you get from the method of moments.  (a) What command do you use to maximize the log-likelihood? Explain its arguments.  (b) What is the estimate?  (c) What is the log-likelihood there? The gradient?
+```{r message=FALSE,warning=FALSE}
+library(MASS)
+data(cats)
+mu<-mean(cats$Hwt)
+v<-var(cats$Hwt)
+shape<-mu^2/v
+scale<-v/mu
+gamma.loglike<-function(p=c(shape,scale)){
+    shape<-p[1]
+    scale<-p[2]
+    return(-sum(dgamma(cats$Hwt,shape,scale,log=TRUE)))
+}
+nlm(gamma.loglike,c(shape,scale))
+```
+
+The estimated shape is 20.29 and estimed scale is 1.909
+The log-liklihood is 325.
+The gradient of shape is 0.00045 and gradient of scale is -0.0042
+
+We need standard errors for the estimated parameters. If we believe the model is accurate, we can get standard errors by simulating from the fitted model, and re-estimating on the simulation output.
+
+2. Write a function, `make.gamma.loglike`, which takes in a data vector `x` and returns a log-likelihood function. 
+```{r}
+make.gamma.loglike<-function(x){
+    gamma.loglike<-function(p=c(shape,scale)){
+    return(-sum(dgamma(x,p[1],p[2],log=TRUE)))
+  }
+  return(gamma.loglike)
+}
+```
+3. Write a function, `gamma.mle`, which takes in a data vector `x`, and returns a shape and a scale parameter, estimated by maximizing the log-likelihood of the gamma distribution. It should use your `make.gamma.loglike` function from the previous part. Check that if `x` is `cats$Hwt`, then `gamma.mle` matches the answer in problem 1.
+```{r message=FALSE,warning=FALSE}
+gamma.mle<-function(x){
+  mu<-mean(x)
+  v<-var(x)
+  shape<-mu^2/v
+  scale<-v/mu
+  z<-nlm(make.gamma.loglike(x),c(shape,scale))
+  return(z)
+}
+gamma.mle(cats$Hwt)
+```
+4. Modify the code from homework 4 to use your `gamma.mle` function, rather than the method-of-moments estimator. In addition to giving the modified code, explain in words what you had to change, and why.
+```{r message=FALSE,warning=FALSE}
+gamma.est<-function(data){
+mu<-mean(data)
+v<-var(data)
+a<-mu^2/v
+s<-v/mu
+return(c('shape'=a,'scale'=s))
+}
+
+gamma.mle<-function(x){
+  shape<-gamma.est(x)[[1]]
+  scale<-gamma.est(x)[[2]]
+  z<-nlm(make.gamma.loglike(x),c(shape,scale))
+  return(z)
+}
+
+gamma.mle(cats$Hwt)
+```
+5. What standard errors do you get from running $10e4$ simulations?
+```{r}
+gamma.est.sim<-function(a,s,n,B){
+  shapes<-c()
+  scales<-c()
+  for (i in 1:B){
+    new_shapes<-gamma.est(rgamma(n,a,s))[[1]]
+    new_scales<-gamma.est(rgamma(n,a,s))[[2]]
+    shapes<-c(shapes,new_shapes)
+    scales<-c(scales,new_scales)
+  }
+  finalarr<-rbind(shapes,scales)
+  return(finalarr)
+}
+
+gamma.est.se<-function(a,s,n,B){ 
+  se.a<-sd(gamma.est.sim(a,s,n,B)[1,])
+  se.s<-sd(gamma.est.sim(a,s,n,B)[2,])
+  newlist<-list("SE_for_shape(a)"=se.a,"SE_for_scale(s)"=se.s)
+  return(newlist)
+}
+
+gamma.est.se(gamma.est(cats$Hwt)[[1]],gamma.est(cats$Hwt)[[2]],length(cats$Hwt),10e4)
+```
+6. An alternative to using simulation is to use the jack-knife.  Calculate jack-knife standard errors for the MLE of the gamma distribution. Your code should be able to work with an arbitrary data vector, not just `cats$Hwt`, and you will want to use functions from problems 1 and 2.
+```{r message=FALSE,warning=FALSE}
+jackknife.gamma<-function(data){
+  n<-length(data)
+  jacksest<-matrix(0,n,2)
+  for (i in 1:n){
+    newdata<-data[-i]
+    newshape<-gamma.est(newdata)[[1]]
+    newscale<-gamma.est(newdata)[[2]]
+    result<-nlm(make.gamma.loglike(newdata),c(newshape,newscale))
+    jacksest[i,]<-c(result$estimate[1],result$estimate[2])
+    }   
+   jackknife.var<-((n-1)^2/n)*apply(jacksest,2,var)
+   jackknife.se<-sqrt(jackknife.var)
+return(jackknife.se)
+}
+```
+7. What are the jackknife standard errors for the MLE? (If you do not have two, one for the shape and one for the scale parameters, something is wrong.)
+```{r message=FALSE,warning=FALSE}
+jackknife.gamma(cats$Hwt)
+```
+8. Do your jackknife standard errors for the MLE match those you got in problem 5? Should they?
+
+It doesn't match. The jacknife standard errors for the MLE is a little bit higher than what I got in Q5.
+
+Part II - Newton's method
+==========
+
+Consider the density $f(x) = \left[ 1 - \cos\{x-\theta\}\right] / 2 \pi$ on $0 \le x \le 2 \pi$, where $\theta$ is a parameter between $-\pi$ and $\pi$.  The following i.i.d. data arise from this density: 3.91, 4.85, 2.28, 4.06, 3.70, 4.04, 5.46, 3.53, 2.28, 1.96, 2.53, 3.88, 2.22, 3.47, 4.82, 2.46, 2.99, 2.54, 0.52, 2.50.  We wish to estimate $\theta$.
+
+9. Graph the log-likelihood function between $-\pi$ and $\pi$.
+```{r}
+library(numDeriv)
+x<-c(3.91, 4.85, 2.28, 4.06, 3.70, 4.04, 5.46, 3.53, 2.28, 1.96, 2.53, 3.88, 2.22, 3.47, 4.82, 2.46, 2.99, 2.54, 0.52, 2.50)
+theta<-seq(-pi,pi,length=1000)
+loglike<-function(theta,x){
+  sum(log((1-cos(x-theta))/(2*pi)))
+}
+vec.loglike<-Vectorize(loglike,"theta")
+plot(theta,vec.loglike(theta,x),ylab='log-likelihood')
+```
+
+10. Find the method of moments estimator of $\theta$.
+```{r}
+mean(x)
+```
+since E(x)=3.2=Integrate x*f(x) dx from 0 to 2pi
+while integrate of x*f(x)dx x from 0 to 2pi by using intergration by part= pi-sin(theta)
+pi-sin(theta)=3.2 => theta=-0.05844
+
+11. Find the MLE for $\theta$ using Newton's method, using the result from 10 as a starting value.  What solutions do you find when you start at -2.7 and 2.7?
+```{r message=FALSE,warning=FALSE}
+nll_one<-deriv(~-log((1-cos(x-theta))/(2*pi)),"theta",function.arg = TRUE)
+
+nll<-function(theta){
+  v<-nll_one(theta)
+  sum(v)
+}
+
+grad.nnl<-function(theta){grad(func=nll,x=theta)}
+
+test1<-optim(par=-0.05844,fn=nll,gr=grad.nnl,lower=-pi,upper=pi,method="L-BFGS-B")
+test1
+```
+By using Newton's method, the starting theta of -0.058 converges to -0.0119
+
+```{r message=FALSE,warning=FALSE}
+test2<-optim(par=-2.7,fn=nll,gr=grad.nnl,lower=-pi,upper=pi,method="L-BFGS-B")
+test2
+```
+When theta starts at -2.7, the theta converge to 3.14
+```{r message=FALSE,warning=FALSE}
+test3<-optim(par=2.7,fn=nll,gr=grad.nnl,lower=-pi,upper=pi,method="L-BFGS-B")
+test3
+```
+when theta starts at 2.7, the theta converges to 3.14
+12. Repeat problem 11 using 200 equally spaced starting values between $-\pi$ and $\pi$.  The partition the interval into sets of attraction.  That is, divide the starting values into separate groups corresponding to the different local modes.  Discuss your results.
+```{r message=FALSE,warning=FALSE}
+thetatest<-seq(-pi,pi,length=200)
+fit<-c()
+for (i in 1:length(thetatest)){
+  result<-optim(thetatest[i],fn=nll,gr=grad.nnl,lower=-pi,upper=pi,method="L-BFGS-B")
+  final<-result$par
+  fit<-c(fit,final)
+}
+fit
+```
+
+13. Find two starting values as close together as you can that converge to different solution using Newton's method.
+
+```{r message=FALSE,warning=FALSE}
+thetatest[13]
+optim(thetatest[13],fn=nll,gr=grad.nnl,lower=-pi,upper=pi,method="L-BFGS-B")
+thetatest[14]
+optim(thetatest[14],fn=nll,gr=grad.nnl,lower=-pi,upper=pi,method="L-BFGS-B")
+```
+when starting theta change from -2.7627 to -2.7311, they converge to different solution
